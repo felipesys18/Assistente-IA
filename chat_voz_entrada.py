@@ -1,5 +1,5 @@
 from llm import perguntar
-from voz import gravar, transcrever
+from voz import falar, gravar, transcrever
 import traceback
 
 SEGUNDOS = 10 #ajuste de tempo de gravação em segundos dps configuro para ser até quando a pessoa parar de falar.
@@ -34,6 +34,7 @@ def main() -> None:
         #devolve a resposta
         historico.append({"role": "user", "content": resposta})
         print(f"Devmais: {resposta}\n") 
+        falar(resposta)
 
 if __name__ == "__main__":
     main()
