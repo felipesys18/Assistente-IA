@@ -1,3 +1,4 @@
+import time
 import numpy as np
 import wave 
 import sounddevice as sd
@@ -5,6 +6,13 @@ import sounddevice as sd
 from piper import PiperVoice, SynthesisConfig
 from pathlib import Path
 from faster_whisper import WhisperModel
+
+#gravar a voz e parar de gravar só quando eu parar de falar inves de falar em segundos
+BLOCO = 0.1  #analisa o audio em pedaços de 0.1 segundos 
+LIMIAR = 200  #volume minimo para contar como fala(pode ser ajustado futuramente caso necessario)
+SILENCIO_FIM = 2.0 #segundos em silencio que pode considerar fim da fala
+ESPERA_MAX = 8 #desiste de esperar se ngm falar em 8s
+GRAVACAO_MAX = 120 #corta gravações muito longas
 
 _CONFIG = SynthesisConfig(length_scale=1.1, noise_scale=0.4, noise_w_scale=0.6)
 
@@ -34,6 +42,47 @@ def gravar(segundos: int, arquivo: str) -> None:
         w.setsampwidth(2) #2 byte por amostra
         w.setframerate(TAXA)
         w.writeframes(audio.tobytes())
+
+def gravar_ate_silencio(arquivo: str) -> bool:
+    """Grava até você parar de falar. Devolve False se ninguém falou."""
+    blocos = [] #todos os pedaços gravados
+    falou = False #já ouvimos fala?
+    silencio = 0.0 #há quanto tempo está quieto
+    inicio = time.time()
+    tam = int(TAXA * BLOCO)
+
+    print("[Ouvindo...]")
+
+    with sd.InputStream(samplerate=TAXA, channels=1, dtype="int16") as fluxo:
+        while True: 
+            dados, _= fluxo.read(tam)
+            blocos.append(dados.copy())
+
+            #volume medio do bloco
+            volume = np.abs (dados).mean()
+
+            if volume > LIMIAR:
+                falou = True
+                silencio = 0.0
+            else:
+                silencio += BLOCO
+            
+            agora = time.time() - inicio
+            if falou and silencio >= SILENCIO_FIM:
+                break  #falou e depois ficou calado(terminou de falar)
+            if not falou and agora > ESPERA_MAX:
+                return False #ninguém falou
+            if agora > GRAVACAO_MAX:
+                break
+
+        audio = np.concatenate(blocos)
+        with wave.open(arquivo, "wb") as w:
+            w.setnchannels(1)
+            w.setsampwidth(2)
+            w.setframerate(TAXA)
+            w.writeframes(audio.tobytes())
+        return True
+
 
 def transcrever(arquivo: str) -> str:
     """Converte um .wav em texto."""
