@@ -1,5 +1,7 @@
 import os, time 
 import requests
+
+from ferramentas import abrir_painel
 from dotenv import load_dotenv
 from google import genai
 from google.genai import errors, types
@@ -14,7 +16,10 @@ SYSTEM_PROMPT = (
     "em no máximo três frases, a menos que peçam detalhes. "
     "Comece confirmando a ação quando for um pedido, por exemplo: "
     "'Certamente.' ou 'Com prazer.' "
-    "Não use markdown, emojis, listas nem símbolos."
+    "Não use markdown, emojis, listas nem símbolos. "
+    "Quando pedirem exemplo de código ou fluxograma, use a ferramenta abrir_painel. "
+    "Na fala, não leia o código linha por linha: explique com suas palavras "
+    "o que ele faz e dê dicas que não estão escritas nele, sem fugir do assunto. "
 )
 
 MAX_TENTATIVAS = 5
@@ -40,20 +45,22 @@ def _gemini(historico: list[dict]) -> str:
     resposta = _cliente_gemini.models.generate_content(
         model=os.environ["GEMINI_MODEL"],
         contents=conteudo,
-        config=types.GenerateContentConfig(system_instruction=SYSTEM_PROMPT),
+        config=types.GenerateContentConfig(
+            system_instruction=SYSTEM_PROMPT,
+            tools=[abrir_painel], #lista de que modelo ela pode usar (DENTRO do config)
+        ),
     )
     return resposta.text or "" #basicamente o texto pode vim None se a resposta for bloqueada
 
 def _ollama(historico: list[dict]) -> str:
-    mensagens = [{"role ": "system", "content": SYSTEM_PROMPT}] + historico #junta uma lista com outra (historico)
+    mensagens = [{"role": "system", "content": SYSTEM_PROMPT}] + historico #junta uma lista com outra (historico)
 
     #ollama rroda o servidor local com na porta 11434
     r = requests.post(
-        "http://localhost:11434/api/generate", 
+        "http://localhost:11434/api/chat", 
         json={
             "model": os.getenv("OLLAMA_MODEL", "llama3.2:3b"),
-            "system": SYSTEM_PROMPT,
-            "prompt": mensagens,
+            "messages": mensagens,
             "stream": False, #False = resposta inteira de uma vez 
         },
         timeout=120, #modelo local em cpu que pode demorar
