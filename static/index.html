@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Devmais</title>
+  <style>
+    body { font-family: sans-serif; background: #111; color: #eee;
+           max-width: 600px; margin: 0 auto; padding: 1rem; }
+    #log { height: 60vh; overflow-y: auto; border: 1px solid #333;
+           padding: .5rem; margin-bottom: .5rem; }
+    .eu { color: #7cf; }
+    .ia { color: #fc7; }
+    input { width: 70%; padding: .6rem; }
+    button { padding: .6rem; }
+  </style>
+</head>
+<body>
+  <h2>Devmais</h2>
+  <div id="log"></div>
+  <input id="texto" placeholder="Digite e aperte Enter">
+  <button id="enviar">Enviar</button>
+  <button id="limpar">Limpar memória</button>
+  <button id="mic">Clique para falar</button>
+
+  <script>
+    const log = document.getElementById("log");
+    const campo = document.getElementById("texto");
+
+    // Adiciona uma linha no histórico da tela
+    function mostrar(classe, quem, msg) {
+      const p = document.createElement("p");
+      p.className = classe;
+      p.textContent = quem + ": " + msg;  // textContent evita injetar HTML
+      log.appendChild(p);
+      log.scrollTop = log.scrollHeight;
+    }
+
+    //toca o áudio que veio do servidor (base64)
+    function tocar(b64) {
+      if (!b64) return;  // não veio áudio: não faz nada
+      const a = new Audio("data:audio/wav;base64," + b64);
+      a.play().catch(() => mostrar("ia", "Devmais", "(toque na tela pra liberar o som)"));
+    }
+
+    async function enviar() {
+      const texto = campo.value.trim();
+      if (!texto) return;
+      campo.value = "";
+      mostrar("eu", "Você", texto);
+
+      // fetch = o navegador chamando a rota POST /chat do servidor
+      const r = await fetch("/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ texto }),
+      });
+      const dados = await r.json();
+      mostrar("ia", "Devmais", dados.resposta || dados.erro);
+      tocar(dados.audio);  //fala a resposta
+    }
+
+    document.getElementById("enviar").onclick = enviar;
+    campo.addEventListener("keydown", e => { if (e.key === "Enter") enviar(); });
+    document.getElementById("limpar").onclick = async () => {
+      await fetch("/limpar", { method: "POST" });
+      log.innerHTML = "";
+    };
+
+    //gravação de voz do user
+    const btnMic = document.getElementById("mic");
+    let gravador = null;
+    let pedacos = [];
+
+    btnMic.onclick = async () => {
+      //primero clique começa a gravar, segundo clique ele para de gravar e envia
+      if (gravador && gravador.state === "recording") {
+        gravador.stop();
+        return;
+      }
+
+      let stream;
+      try {
+        // pedir a permissão do mic(funciona só em localhost ou HTTPS)
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      } catch (e) {
+        mostrar("ia", "Devmais", "Sem acesso ao microfone: " + e.name);
+        return;
+      }
+
+      pedacos = [];
+      gravador = new MediaRecorder(stream);
+      gravador.ondataavailable = e => pedacos.push(e.data);
+      gravador.onstop = async () => {
+        stream.getTracks().forEach(t => t.stop());  //desligar o microfone
+        btnMic.textContent = "Clique para falar";   //botão volta ao normal
+        const blob = new Blob(pedacos, { type: gravador.mimeType });
+
+        //FormData = formulario com arquivo, o que o FastApi espera em /voz
+        const form = new FormData();
+        form.append("audio", blob, "fala.webm");
+
+        mostrar("eu", "Você", "(processando áudio...)");
+        try {
+          // (estava faltando): envia o áudio e cria a variável "dados"
+          const r = await fetch("/voz", { method: "POST", body: form });
+          const dados = await r.json();
+          if (dados.erro) { mostrar("ia", "Devmais", dados.erro); return; }
+          mostrar("eu", "Você", dados.texto);
+          mostrar("ia", "Devmais", dados.resposta);
+          tocar(dados.audio);  //fala a resposta
+        } catch (e) {
+          mostrar("ia", "Devmais", "Erro ao enviar áudio: " + e.message);
+        }
+      };
+
+      gravador.start();
+      btnMic.textContent = "Parar e enviar";
+    };
+  </script>
+</body>
+</html>

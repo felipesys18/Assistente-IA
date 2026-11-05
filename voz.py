@@ -2,6 +2,7 @@ import time
 import numpy as np
 import wave 
 import sounddevice as sd
+import io
 
 from piper import PiperVoice, SynthesisConfig
 from pathlib import Path
@@ -109,3 +110,21 @@ def falar (texto: str) -> None:
     audio = np.concatenate(pedacos) #juntar todos os pedacos em um aúdio só
     sd.play(audio, int(taxa * 0.93)) #começar a tocar em segundo plano
     sd.wait() #espera terminar de falar
+
+def sintetizar_wav(texto: str) -> bytes:
+    pedacos = []
+    taxa = 22050
+    for chunk in _piper.synthesize(texto, syn_config=_CONFIG):
+        taxa = chunk.sample_rate
+        pedacos.append(chunk.audio_int16_array)
+    if not pedacos:
+        return b""
+    audio = np.concatenate(pedacos)
+
+    buf = io.BytesIO()  #vai ser nosso local que servira como arquivo temporario
+    with wave.open(buf, "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(taxa)
+        w.writeframes(audio.tobytes())
+    return buf.getvalue()
