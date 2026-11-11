@@ -5,4 +5,5 @@ __pycache__/
 models/
 *.wav
 *.mp3
+cartoes.json
 paineis/
