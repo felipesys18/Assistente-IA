@@ -1,7 +1,7 @@
 import os, time 
 import requests
 
-from ferramentas import abrir_painel
+from ferramentas import abrir_painel, criar_cartoes, proximo_cartao, registrar_resposta
 from dotenv import load_dotenv
 from google import genai
 from google.genai import errors, types
@@ -20,6 +20,12 @@ SYSTEM_PROMPT = (
     "Quando pedirem exemplo de código ou fluxograma, use a ferramenta abrir_painel. "
     "Na fala, não leia o código linha por linha: explique com suas palavras "
     "o que ele faz e dê dicas que não estão escritas nele, sem fugir do assunto. "
+    "Para flashcards, use criar_cartoes ao criar, ordenando do mais fácil ao mais "
+    "difícil e informando a dificuldade de cada um. Depois de criar, comece a cobrar "
+    "na hora: chame proximo_cartao e faça a primeira pergunta. "
+    "Faça uma pergunta por vez e só revele a resposta certa depois que o usuário "
+    "responder. Depois de corrigir, use registrar_resposta e então chame "
+    "proximo_cartao de novo. "
 )
 
 MAX_TENTATIVAS = 5
@@ -47,7 +53,7 @@ def _gemini(historico: list[dict]) -> str:
         contents=conteudo,
         config=types.GenerateContentConfig(
             system_instruction=SYSTEM_PROMPT,
-            tools=[abrir_painel], #lista de que modelo ela pode usar (DENTRO do config)
+            tools=[abrir_painel, criar_cartoes, proximo_cartao, registrar_resposta], #lista de que modelo ela pode usar (DENTRO do config)
         ),
     )
     return resposta.text or "" #basicamente o texto pode vim None se a resposta for bloqueada
@@ -88,3 +94,4 @@ def perguntar(historico: list[dict]) -> str:
             print(f"[erro {e.code}, tentando de novo em {espera}s...]")
             time.sleep(espera)
     return ""
+

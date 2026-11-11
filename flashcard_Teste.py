@@ -1,9 +1,6 @@
-from flashcard import adicionar, pendentes, responder
+from flashcard import adicionar, pendentes
 
-adicionar("O que é fotossíntese?", "Processo em que plantas transformam luz em energia.")
-adicionar("Onde ocorre a fotossíntese?", "Nos cloroplastos.")
-
-print("Pendentes:", len(pendentes()))  #esperado: 2
-print(responder("O que é fotossíntese?", True))   #caixa 2, volta em 2 dias
-print("Pendentes:", len(pendentes()))   #esperado: 1
-print(responder("Onde ocorre a fotossíntese?", False))  #caixa 1, volta em 1 dia
+print(adicionar("Pergunta difícil", "...", 3))   # True
+print(adicionar("Pergunta fácil", "...", 1))     # True
+print(adicionar("Pergunta fácil", "...", 1))     # False (duplicado)
+print([c["frente"] for c in pendentes()])        # fácil antes da difícil

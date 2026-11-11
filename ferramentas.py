@@ -4,6 +4,8 @@ import webbrowser #serve para abrir o navegador do notebook/computador
 from pathlib import Path #caminhos de arquivos
 from uuid import uuid4 #gera nomes únicos (evitando sobrescrever painéis)
 
+from flashcard import adicionar, pendentes, responder # CORRIGIDO: faltava este import
+
 PASTA = Path(__file__).parent / "paineis" #pasta onde os painéis serão salvos
 TIPOS_PERMITIDOS = ("codigo", "fluxograma") #lista curta de ações que são permitidas
 
@@ -52,3 +54,50 @@ def abrir_painel(tipo: str, titulo: str, conteudo: str) -> str:
     arquivo.write_text(pagina, encoding="utf-8")
     webbrowser.open(arquivo.as_uri()) #abre nosso navegador do notebook
     return "Painel aberto na tela"
+
+def criar_cartoes(frentes: list[str], versos: list[str], dificuldades: list[int]) -> str: # CORRIGIDO: nome minúsculo e "dificuldades" no plural
+    """Cria flashcard de estudo e salva para revisões futuras.
+    
+    Use quando o usuário pedir flashcards sobre um assunto.
+    frentes: as perguntas, uma por questão.
+    versos: as respostas, na mesma ordem das frentes.
+    dificuldades: um número por cartão, na mesma ordem:
+    1 = fácil, 2 = médio, 3 = difícil.
+    """
+
+    if not (len(frentes) == len(versos) == len(dificuldades)):
+        return "Erro: frentes, versos e dificuldades precisam ter o mesmo tamanho"
+    if not frentes or len(frentes) > 20: #limite por segurança
+        return "Erro: envie de 1 a 20 por vez."
+
+    criados = 0
+    for frente, verso, dif in zip(frentes, versos, dificuldades):
+        dif = max(1, min(3, dif))            # garante que fica entre 1 e 3
+        if adicionar(frente, verso, dif):    # True = criou, False = já existia
+            criados += 1
+    return f"Criei {criados} cartões novos."
+
+def proximo_cartao() -> str:
+    """Devolve o próximo flashcard que está na hora de revisar
+    
+    Use quando o usuário pedir para ser cobrado ou treinar os cartões,
+    e logo depois de criar flashcards novos.
+    Faça apenas a pergunta (frente) ao usuário e só revele a resposta
+    (verso) depois que ele responder.
+    """
+
+    lista = pendentes()
+
+    if not lista:
+        return "Erro: Nenhum cartão para revisão hoje"
+    c = lista[0]
+    return f"FRENTE: {c['frente']} | VERSO: {c['verso']}"
+
+def registrar_resposta(frente: str, acertou: bool) -> str:
+    """Registra se o usuário acertou ou errou um flashcard
+
+    Use depois que o usuário responder uma pergunta de flashcard.
+    frente: a pergunta exata do cartão, como veio de proximo_cartao.
+    acertou: True se o usuário acertou, False se errou.
+    """
+    return responder(frente, acertou) # CORRIGIDO: era responder(frente, verso)
