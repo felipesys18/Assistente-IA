@@ -75,7 +75,7 @@ python -m piper.download_voices pt_BR-jeff-medium --download-dir models
 ### No terminal (voz, sem servidor)
 
 ```powershell
-python jarvis.py
+python devmais.py
 ```
 
 Fale normalmente. Comandos de voz: **"limpar memória"** e **"encerrar"**.
